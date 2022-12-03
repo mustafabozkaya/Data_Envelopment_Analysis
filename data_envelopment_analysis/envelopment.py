@@ -48,10 +48,12 @@ class DEA(object):
             (self.num_in, 1), dtype=np.float64)  # input weights
         self.lambdas = np.zeros((self.num_record, 1),
                                 dtype=np.float64)  # unit efficiencies
-        self.efficiency = np.zeros_like(self.lambdas)  # thetas
+        self.efficiency = np.zeros_like(self.lambdas)  # thetas means efficiencies
 
         # names
         self.names = []
+    def _objective(self):
+
 
     def __efficiency(self, unit):
         """
@@ -74,7 +76,7 @@ class DEA(object):
     def __target(self, weights, unit):
         """
         Theta target function for one unit
-        :param x: combined weights (input, output, lambdas)
+        :param weights: combined weights (input, output, lambdas)
         :param unit: which production unit to compute
         :return: theta
         """
@@ -87,7 +89,7 @@ class DEA(object):
 
         return numerator/denominator
 
-    def __constraints(self, weights, unit):
+    def __ieconstraints(self, weights, unit):
         """
         Constraints for optimization for one unit
         :param x: combined weights
@@ -121,6 +123,14 @@ class DEA(object):
 
         return np.array(constr)
 
+    def __econstraints(self, weights, unit,input_or_output):
+       constr = []  # init the constraint array
+       if input_or_output == 'input':
+           in_w, out_w, lambdas = weights[:self.num_in], weights[self.num_in:(
+               self.num_in+self.num_out)], weights[(self.num_in+self.num_out):]
+              for input in self.input_:
+
+
     def __optimize(self):
         """
         Optimization of the DEA model
@@ -136,9 +146,18 @@ class DEA(object):
             # weights
             # initial weights are random numbers between 0 and 1
             x0 = np.random.rand(d0)
+
+            equals_const_list=[] # list of equality constraints
+            # for each input
+            for input in self.input_:
+                # equality constraint
+                equals_const_list.append({'type': 'eq', 'fun': lambda x: np.dot(self.inputs[:, input], x[self.num_in+self.num_out:]) - self.inputs[unit, input]})
             # minimize the target function
             x0 = fmin_slsqp(self.__target, x0,
-                            f_ieqcons=self.__constraints, args=(unit,))
+                            f_ieqcons=self.__ieconstraints,
+                            f_eqcons=self._econstraints,
+                            args=(unit,)
+                            )
             # unroll weights
             self.input_w, self.output_w, self.lambdas = x0[:self.num_in], x0[self.num_in:(
                 self.num_in+self.num_out)], x0[(self.num_in+self.num_out):]
